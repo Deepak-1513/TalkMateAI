@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 dotenv.config({path: "./.env" });
 
-console.log("1. Starting Gemini test...");
+// console.log("1. Starting Gemini test...");
 
 const apiKey = process.env.GEMINI_API_KEY;
 

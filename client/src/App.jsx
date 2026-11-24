@@ -2,6 +2,8 @@
 import React from 'react'
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { io } from "socket.io-client";
+import NotificationComponent  from "./Notification";
+import { Box } from '@mui/material';
 
 const App = () => {
 
@@ -22,6 +24,7 @@ const App = () => {
     const [joinedRoom, setJoinedRoom] = useState("");
 
     const [aiLoading, setAiLoading] = useState(false);
+    const [paymentLoading, setPaymentLoading] = useState(false);
 
     const socket = useMemo(() => {
         return io("http://localhost:3000/");
@@ -87,7 +90,7 @@ const handleAIReply = async () => {
         setAiLoading(true);
 
         // Convert existing chat messages into Gemini format
-        const chatHistory = messages
+      const chatHistory = messages
     .filter((msg) => msg.senderId !== "AI")
     .map((msg) => ({
         role: msg.senderId === myId ? "user" : "model",
@@ -179,13 +182,106 @@ while (
 
     };
 
+
+
+    const handlePayment = async () => {
+    try {
+        setPaymentLoading(true);
+
+        const response = await fetch(
+            "http://localhost:3000/api/payment/create-order",
+            {
+                method: "POST"
+            }
+        );
+
+            const data = await response.json();
+            //             {
+            //     success: true,
+            //     order: {
+            //         id: "order_ABC123",
+            //         amount: 1000,
+            //         currency: "INR",
+            //         receipt: "receipt_123" yhi aayega
+            //     }
+            // }
+
+            if (!response.ok) {
+                throw new Error(data.message || "Order creation failed");
+            }
+
+            console.log("Created Order:", data.order);
+
+            const options = {
+                key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+                amount: data.order.amount,
+                currency: data.order.currency,
+                name: "TalkMate",
+                description: "TalkMate Payment",
+                order_id: data.order.id,
+
+                // handler: function (response) {
+                //   //  console.log("Payment Response:", response);  
+                // //                     {
+                // //     razorpay_payment_id: "pay_ABC123",
+                // //     razorpay_order_id: "order_XYZ456",
+                // //     razorpay_signature: "a1b2c3..."
+                // // } yha ye response h razorpay pop window se aa rhi
+                // }
+
+                handler: async function (paymentResponse) {
+                try {
+                    const verifyResponse = await fetch(
+                        "http://localhost:3000/api/payment/verify",
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify(paymentResponse)
+                        }
+                    );
+
+                    const verifyData = await verifyResponse.json();
+
+                    if (!verifyResponse.ok) {
+                        throw new Error(verifyData.message);
+                    }
+
+                    alert("Payment verified successfully!");
+
+                    console.log("Verification Result:", verifyData);
+
+                } catch (error) {
+                    console.error("Verification Error:", error);
+                    alert(error.message || "Payment verification failed");
+                }
+            }
+            };
+            // Pehla response order create hone ka result hai, doosra payment hone ka result hai. Dono alag objects hain.
+
+            const razorpay = new window.Razorpay(options);
+
+            razorpay.open();
+
+        } catch (error) {
+            console.error("Payment Error:", error);
+            alert(error.message);
+        } finally {
+            setPaymentLoading(false);
+        }
+    };
+
+
+
+
     useEffect(() => {
 
-        const handleConnect = () => {
-            console.log("user Connected");
-            setMyId(socket.id);
-            console.log("My Socket ID:", socket.id);
-        };
+        // const handleConnect = () => {
+        //     console.log("user Connected");
+        //     setMyId(socket.id);
+        //     console.log("My Socket ID:", socket.id);
+        // };
 
         const handleWelcome = (s) => {
             console.log(s);
@@ -204,10 +300,10 @@ while (
         });
 
         socket.on("message", (data) => {
-            setMessages((prev) => [...prev, data]);
+            setMessages((prev) => [...prev, data]);  
         });
 
-        socket.on("connect", handleConnect);
+      //  socket.on("connection", handleConnect);
         socket.on("welcome", handleWelcome);
 
         return () => {
@@ -229,6 +325,14 @@ while (
             marginTop: "10px",
             margin: "30px"
         }}>
+            <NotificationComponent socket={socket} />
+            
+         <button
+            onClick={handlePayment}
+            disabled={paymentLoading}
+         >
+            {paymentLoading ? "Processing..." : "Pay Now"}
+         </button>
 
             {/* Online Users */}
             <div style={{
@@ -285,7 +389,7 @@ while (
 
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-lg w-96">
+          <Box sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)', p: 3, borderRadius: 3, boxShadow: 3, width: 384, }}>
 
                 <h2 className="text-xl font-bold mb-4 text-center">
                     Chat Room
@@ -316,8 +420,16 @@ while (
                 </div>
 
                 {/* Message Input */}
-                <div className="flex gap-2 padding-3px margin-5px">
-
+                
+         
+               <Box
+                    sx={{
+                        display: 'flex',
+                        gap: '8px',
+                        padding: '1px',
+                        margin: '3px'
+                    }}
+                    >
                     <input
                         type="text"
                         placeholder="Enter your message..."
@@ -345,7 +457,8 @@ while (
                         {aiLoading ? "Thinking..." : "MitraAi🫂"}
                     </button>
 
-                </div>
+                    </Box>
+               
 
                 {/* Typing Indicator */}
                 <div style={{
@@ -430,7 +543,7 @@ while (
 
                 </div>
 
-            </div>
+            </Box>
 
         </div>
     );
